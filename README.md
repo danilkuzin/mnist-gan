@@ -6,22 +6,23 @@ Minimal GAN example before introducing modern techniques.
 ## Model
 **Generator**
 * 3-layer MLP
-* LeakyReLU
+* ReLU
 * BatchNorm
-* tanh
+* sigmoid
 
 **Discriminator**
-* 3-layer MLP
-* LeakyReLU
+* 2-layer Maxout
+* Dropout
+* Final linear projection
 * Binary classification
 
 ## Data and hyperparameters
 * MNIST train
-* Adam (beta=(0.5, 0.999))
-* lr d = 1e-4
-* lr g = 3e-4
-* latent dim = 64
-* batch size = 32
+* SGD (momentum=0.5)
+* lr d = 1e-1
+* lr g = 1e-1
+* latent dim = 100
+* batch size = 100
 
 ## Losses
 BCE. GAN losses are not expected to decrease monotonically.
@@ -31,12 +32,15 @@ BCE. GAN losses are not expected to decrease monotonically.
 
 ## Generations
 Samples generated from a fixed latent vector.
-* ![initial](results/samples_iter_-1.png)
-* ![9 epoch](results/samples_iter_9.png)
-* ![19 epoch](results/samples_iter_19.png)
-* ![29 epoch](results/samples_iter_29.png)
-* ![39 epoch](results/samples_iter_39.png)
-* ![49 epoch](results/samples_iter_49.png)
+* Initial ![initial](results/samples_iter_0.png)
+* 10 epochs ![10 epochs](results/samples_iter_10.png)
+* 20 epochs ![20 epochs](results/samples_iter_20.png)
+* 30 epochs ![30 epochs](results/samples_iter_30.png)
+* 40 epochs ![40 epochs](results/samples_iter_40.png)
+* 50 epochs ![50 epochs](results/samples_iter_50.png)
+
+## Interpolations
+![](results/interpolated_iter_190.png)
 
 ## Running
 Build docker image

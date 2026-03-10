@@ -6,7 +6,7 @@ from ganmnist.model import GAN
 
 
 def sample(batch_size, z_dim):
-    return torch.randn((batch_size, z_dim))
+    return torch.rand(batch_size, z_dim) * 2 - 1
 
 
 def train_epoch(
@@ -14,13 +14,13 @@ def train_epoch(
     optimizer_d: torch.optim.Optimizer,
     optimizer_g: torch.optim.Optimizer,
     gan: GAN,
+    generator_loss_type: str,
 ) -> tuple[float, float, float]:
-    gan.train()
 
     losses_d_real, losses_d_fake, losses_g = [], [], []
     for batch in dl:
         # train discriminator
-        x = batch["image"].to("cuda") / 127.5 - 1.0
+        x = batch["image"].to("cuda") / 255
         x = x.view(-1, 28 * 28 * 1)
 
         optimizer_d.zero_grad()
@@ -31,7 +31,7 @@ def train_epoch(
         disc_real = gan.dis(x).view(-1)
 
         loss_d_real = F.binary_cross_entropy_with_logits(
-            disc_real, torch.ones_like(disc_real) * 0.9
+            disc_real, torch.ones_like(disc_real)
         )
 
         disc_fake = gan.dis(g_z.detach()).view(-1)
@@ -39,7 +39,7 @@ def train_epoch(
         loss_d_fake = F.binary_cross_entropy_with_logits(
             disc_fake, torch.zeros_like(disc_fake)
         )
-        loss_d = (loss_d_real + loss_d_fake) / 2
+        loss_d = loss_d_real + loss_d_fake
 
         loss_d.backward()
         optimizer_d.step()
@@ -47,6 +47,9 @@ def train_epoch(
         losses_d_fake.append(loss_d_fake.item())
 
         # train generator
+        for p in gan.dis.parameters():
+            p.requires_grad = False
+
         optimizer_g.zero_grad()
 
         z_g = sample(x.shape[0], gan.gen.z_dim).to("cuda")
@@ -54,11 +57,21 @@ def train_epoch(
         g_z = gan.gen(z_g)
         output = gan.dis(g_z)
 
-        loss_g = F.binary_cross_entropy_with_logits(output, torch.ones_like(output))
+        if generator_loss_type == "non_saturating":
+            loss_g = F.binary_cross_entropy_with_logits(output, torch.ones_like(output))
+        elif generator_loss_type == "minimax":
+            loss_g = -F.binary_cross_entropy_with_logits(
+                output, torch.zeros_like(output)
+            )
+        else:
+            raise Exception("Wrong generator loss type")
 
         loss_g.backward()
         optimizer_g.step()
         losses_g.append(loss_g.item())
+
+        for p in gan.dis.parameters():
+            p.requires_grad = True
 
     return (
         np.array(losses_d_real).mean(),
