@@ -1,0 +1,20 @@
+model: vanilla_gan
+
+dataset: 
+  name: mnist
+  image_size: 28
+  channels: 1
+
+training:
+  epochs: 200
+  batch_size: 100
+  seed: 100
+
+generator:
+  z_dim: 100
+  num_features: 1200
+  generator_loss_type: non_saturating
+
+visualise:
+  plot_epochs: 10
+  plot_steps: 0

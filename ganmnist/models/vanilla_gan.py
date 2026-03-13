@@ -23,13 +23,13 @@ class Maxout(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim: int, im_dim: int) -> None:
+    def __init__(self, z_dim: int, im_dim: int, num_features: int) -> None:
         super().__init__()
         self.z_dim = z_dim
         self.im_dim = im_dim
-        self.linear1 = nn.Linear(z_dim, 1200)
-        self.linear2 = nn.Linear(1200, 1200)
-        self.linear3 = nn.Linear(1200, im_dim)
+        self.linear1 = nn.Linear(z_dim, num_features)
+        self.linear2 = nn.Linear(num_features, num_features)
+        self.linear3 = nn.Linear(num_features, im_dim)
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         z = self.linear1(z)
@@ -65,9 +65,9 @@ class Discriminator(nn.Module):
 
 
 class GAN(nn.Module):
-    def __init__(self, z_dim: int, im_dim: int) -> None:
+    def __init__(self, z_dim: int, im_dim: int, num_gen_features: int) -> None:
         super().__init__()
-        self.gen = Generator(z_dim, im_dim)
+        self.gen = Generator(z_dim, im_dim, num_gen_features)
         self.dis = Discriminator(im_dim)
 
 

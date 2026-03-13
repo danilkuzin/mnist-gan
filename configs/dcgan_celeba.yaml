@@ -1,0 +1,23 @@
+model: dcgan
+
+dataset:
+  name: celeba
+  image_size: 64
+  channels: 3
+
+training:
+  epochs: 5
+  batch_size: 128
+  seed: 100
+
+generator:
+  z_dim: 100
+  num_features: 64
+  generator_loss_type: non_saturating
+
+discriminator: 
+  num_features: 64
+
+visualise:
+  plot_epochs: 1
+  plot_steps: 100
