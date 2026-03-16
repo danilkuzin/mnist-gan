@@ -43,12 +43,12 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_features: int) -> None:
+    def __init__(self, in_features: int, num_units: int) -> None:
         super().__init__()
         self.in_features = in_features
-        self.mo1 = Maxout(in_features, 240, 5)
-        self.mo2 = Maxout(240, 240, 5)
-        self.linear = nn.Linear(240, 1)
+        self.mo1 = Maxout(in_features, num_units, 5)
+        self.mo2 = Maxout(num_units, num_units, 5)
+        self.linear = nn.Linear(num_units, 1)
         self.d1 = nn.Dropout(0.5)
         self.d2 = nn.Dropout(0.5)
         self.d3 = nn.Dropout(0.5)
@@ -65,10 +65,12 @@ class Discriminator(nn.Module):
 
 
 class GAN(nn.Module):
-    def __init__(self, z_dim: int, im_dim: int, num_gen_features: int) -> None:
+    def __init__(
+        self, z_dim: int, im_dim: int, num_gen_features: int, num_dis_features: int
+    ) -> None:
         super().__init__()
         self.gen = Generator(z_dim, im_dim, num_gen_features)
-        self.dis = Discriminator(im_dim)
+        self.dis = Discriminator(im_dim, num_dis_features)
 
 
 def init_generator(m):

@@ -1,38 +1,38 @@
 model: vanilla_gan
 
 dataset: 
-  name: mnist
-  image_size: 28
+  name: tfd
+  image_size: 48
   channels: 1
 
 training:
-  epochs: 200
+  epochs: 10
   batch_size: 100
   seed: 100
 
 generator:
   z_dim: 100
-  num_features: 1200
+  num_features: 8000
   generator_loss_type: non_saturating
-  pretrain_epochs: 0
+  pretrain_epochs: 1
 
 discriminator: 
-  num_features: 240
+  num_features: 1200
 
 visualise:
-  plot_epochs: 10
+  plot_epochs: 1
   plot_steps: 0
 
 optimizers:
   discriminator:
     name: "SGD"
     params:
-      lr: 0.1
+      lr: 0.05
       momentum: 0.5
   generator:
     name: "SGD"
     params:
-      lr: 0.1
+      lr: 0.05
       momentum: 0.5
 
 schedulers:

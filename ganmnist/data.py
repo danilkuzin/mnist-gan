@@ -1,7 +1,9 @@
 import datasets
+from scipy import io as sio
 import torch
 import torchvision
 import torchvision.transforms as transforms
+from torch.utils.data import TensorDataset
 
 
 def load_mnist() -> tuple[datasets.Dataset, datasets.Dataset]:
@@ -22,10 +24,30 @@ def load_mnist() -> tuple[datasets.Dataset, datasets.Dataset]:
     return ds["train"], ds["test"]
 
 
+def load_lsun() -> tuple[datasets.Dataset, datasets.Dataset]:
+
+    ds = datasets.load_dataset(
+        "pcuenq/lsun-bedrooms", cache_dir="/data/huggingface/datasets"
+    )
+
+    preprocess = transforms.Compose(
+        [transforms.ToTensor(), transforms.Lambda(lambda x: x.view(-1, 28 * 28))]
+    )
+
+    def transform_fn(batch):
+        batch["image"] = [preprocess(img) for img in batch["image"]]
+        batch["label"] = [torch.tensor(l) for l in batch["label"]]
+        return batch
+
+    ds.set_transform(transform_fn)
+
+    return ds["train"], ds["test"]
+
+
 def load_celeba() -> (
     tuple[torchvision.datasets.VisionDataset, torchvision.datasets.VisionDataset]
 ):
-    ds_transform = torchvision.transforms.Compose(
+    ds_transform = transforms.Compose(
         [
             transforms.Resize((64, 64)),
             transforms.ToTensor(),
@@ -47,6 +69,16 @@ def load_celeba() -> (
     return ds_train, ds_test
 
 
+def load_tfd():
+    "based on https://github.com/nouiz/lisa_emotiw/blob/master/emotiw/common/datasets/faces/tfd.py"
+    data = sio.loadmat("/data/datasets/TFD/TFD_48x48.mat")
+    images = torch.from_numpy(data["images"]).float().reshape(-1, 48 * 48) / 255
+    labels = torch.from_numpy(data["labs_ex"]).long()
+    dataset = TensorDataset(images, labels)
+
+    return dataset, None
+
+
 def load_dataset(
     ds_name: str,
 ) -> tuple[
@@ -57,5 +89,9 @@ def load_dataset(
         return load_mnist()
     elif ds_name == "celeba":
         return load_celeba()
+    elif ds_name == "tfd":
+        return load_tfd()
+    elif ds_name == "lsun":
+        return load_lsun()
     else:
         raise Exception()

@@ -4,8 +4,6 @@ from argparse import ArgumentParser
 
 import torch
 import torchvision.utils
-from torch.optim import SGD, Adam
-from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
@@ -55,9 +53,12 @@ def compute_pixel_mean(dataset):
 def load_model(config):
     if config.model == "vanilla_gan":
         im_dim = (config.dataset.image_size**2) * config.dataset.channels
-        gan = GAN(config.generator.z_dim, im_dim, config.generator.num_features).to(
-            "cuda"
-        )
+        gan = GAN(
+            config.generator.z_dim,
+            im_dim,
+            config.generator.num_features,
+            config.discriminator.num_features,
+        ).to("cuda")
 
         gan.gen.apply(init_generator)
         gan.dis.apply(init_discriminator)
@@ -79,18 +80,32 @@ def load_model(config):
 
 
 def get_optimizers(gan, config):
-    if config.model == "vanilla_gan":
-        optimizer_d = SGD(list(gan.dis.parameters()), lr=1e-1, momentum=0.5)
-        optimizer_g = SGD(list(gan.gen.parameters()), lr=1e-1, momentum=0.5)
-        scheduler_d = ExponentialLR(optimizer_d, gamma=1 / 1.000004)
-        scheduler_g = ExponentialLR(optimizer_g, gamma=1 / 1.000004)
-    elif config.model == "dcgan":
-        optimizer_d = Adam(list(gan.dis.parameters()), lr=1e-4, betas=(0.5, 0.999))
-        optimizer_g = Adam(list(gan.gen.parameters()), lr=3e-4, betas=(0.5, 0.999))
-        scheduler_d = None
-        scheduler_g = None
-    else:
-        raise Exception()
+    OptimClassD = getattr(torch.optim, config.optimizers.discriminator.name)
+    OptimClassG = getattr(torch.optim, config.optimizers.generator.name)
+
+    optimizer_d = OptimClassD(
+        gan.dis.parameters(), **config.optimizers.discriminator.params
+    )
+    optimizer_g = OptimClassG(
+        gan.gen.parameters(), **config.optimizers.generator.params
+    )
+
+    scheduler_d, scheduler_g = None, None
+
+    if getattr(config, "schedulers", None):
+        if config.schedulers.discriminator:
+            SchedClassD = getattr(
+                torch.optim.lr_scheduler, config.schedulers.discriminator.name
+            )
+            scheduler_d = SchedClassD(
+                optimizer_d, **config.schedulers.discriminator.params
+            )
+
+        if config.schedulers.generator:
+            SchedClassG = getattr(
+                torch.optim.lr_scheduler, config.schedulers.generator.name
+            )
+            scheduler_g = SchedClassG(optimizer_g, **config.schedulers.generator.params)
 
     return optimizer_d, optimizer_g, scheduler_d, scheduler_g
 
@@ -123,7 +138,10 @@ if __name__ == "__main__":
             - 1
         )
         value_range = (0, 1)
-        format_ds = "huggingface"
+        if config.dataset.name == "mnist":
+            format_ds = "huggingface"
+        else:
+            format_ds = "torchvision"
     elif config.model == "dcgan":
         sample_fn = lambda: torch.randn(
             (config.training.batch_size, config.generator.z_dim, 1, 1)
@@ -170,6 +188,25 @@ if __name__ == "__main__":
             1,
             value_range,
         )
+
+    optimizer = torch.optim.SGD(gan.gen.parameters(), lr=0.05, momentum=0.5)
+    criterion = torch.nn.BCELoss()
+
+    if config.generator.pretrain_epochs > 0:
+        for epoch in range(config.generator.pretrain_epochs):
+            for real_images, _ in dl_train:
+                real_images = real_images.to("cuda")
+                batch_size = real_images.size(0)
+
+                z = torch.randn(batch_size, 100, device="cuda")
+                fake_images = gan.gen(z)
+                loss = criterion(fake_images, real_images)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            print(epoch, loss.item())
 
     last_iter = 0
     for epoch in range(config.training.epochs):

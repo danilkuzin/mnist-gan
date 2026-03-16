@@ -57,6 +57,13 @@ Samples generated from a fixed latent vector.
 ### Interpolations
 ![](results/vanilla_mnist/interpolated_iter_190.png)
 
+## Vanilla GAN - TFD
+### Generations
+![initial](results/vanilla_tfd/vanilla_tfd_generated.png)
+
+### Interpolations
+![initial](results/vanilla_tfd/vanilla_tfd_interpolated.png)
+
 ## DCGAN - CelebA
 
 ### Model
