@@ -60,7 +60,7 @@ class GlobalConfig(BaseModel):
     discriminator: DiscriminatorConfig
     visualise: VisualiseConfig
     optimizers: OptimizersConfig
-    schedulers: SchedulersConfig
+    schedulers: Optional[SchedulersConfig]
 
 
 def load_config(path: str):

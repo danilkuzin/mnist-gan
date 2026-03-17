@@ -88,3 +88,11 @@ Samples generated from a fixed latent vector.
 
 ### Interpolations
 * ![](results/dcgan_celeba/interpolations.png)
+
+## DCGAN - LSUN bedrooms
+
+### Generations
+* ![](results/dcgan_lsun/DCGAN_lsun_generated.png)
+
+### Interpolations
+* ![](results/dcgan_lsun/DCGAN_lsun_interpolated.png)

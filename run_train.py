@@ -147,7 +147,10 @@ if __name__ == "__main__":
             (config.training.batch_size, config.generator.z_dim, 1, 1)
         )
         value_range = (-1, 1)
-        format_ds = "torchvision"
+        if config.dataset.name == "lsun":
+            format_ds = "huggingface"
+        else:
+            format_ds = "torchvision"
     else:
         raise Exception()
 

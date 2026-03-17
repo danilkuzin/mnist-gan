@@ -1,0 +1,38 @@
+model: dcgan
+
+dataset:
+  name: lsun
+  image_size: 64
+  channels: 3
+
+training:
+  epochs: 5
+  batch_size: 128
+  seed: 100
+
+generator:
+  z_dim: 100
+  num_features: 64
+  generator_loss_type: non_saturating
+  pretrain_epochs: 0
+
+discriminator: 
+  num_features: 64
+
+visualise:
+  plot_epochs: 1
+  plot_steps: 100
+
+optimizers:
+  discriminator:
+    name: "Adam"
+    params:
+      lr: 0.0002
+      betas: [0.5, 0.999]
+  generator:
+    name: "Adam"
+    params:
+      lr: 0.0002
+      betas: [0.5, 0.999]
+      
+schedulers: null

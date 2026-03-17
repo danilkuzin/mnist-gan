@@ -31,12 +31,18 @@ def load_lsun() -> tuple[datasets.Dataset, datasets.Dataset]:
     )
 
     preprocess = transforms.Compose(
-        [transforms.ToTensor(), transforms.Lambda(lambda x: x.view(-1, 28 * 28))]
+        [
+            # transforms.RandomCrop((64, 64)),
+            transforms.Resize(64),
+            transforms.CenterCrop(64),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+        ]
     )
 
     def transform_fn(batch):
         batch["image"] = [preprocess(img) for img in batch["image"]]
-        batch["label"] = [torch.tensor(l) for l in batch["label"]]
+        # batch["label"] = [torch.tensor(l) for l in batch["label"]]
         return batch
 
     ds.set_transform(transform_fn)
