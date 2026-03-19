@@ -1,4 +1,5 @@
 import datasets
+from ganmnist.config import DatasetConfig
 from scipy import io as sio
 import torch
 import torchvision
@@ -24,7 +25,9 @@ def load_mnist() -> tuple[datasets.Dataset, datasets.Dataset]:
     return ds["train"], ds["test"]
 
 
-def load_lsun() -> tuple[datasets.Dataset, datasets.Dataset]:
+def load_lsun(
+    dataset_config: DatasetConfig,
+) -> tuple[datasets.Dataset, datasets.Dataset]:
 
     ds = datasets.load_dataset(
         "pcuenq/lsun-bedrooms", cache_dir="/data/huggingface/datasets"
@@ -32,9 +35,8 @@ def load_lsun() -> tuple[datasets.Dataset, datasets.Dataset]:
 
     preprocess = transforms.Compose(
         [
-            # transforms.RandomCrop((64, 64)),
-            transforms.Resize(64),
-            transforms.CenterCrop(64),
+            transforms.Resize(dataset_config.image_size),
+            transforms.CenterCrop(dataset_config.image_size),
             transforms.ToTensor(),
             transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
         ]
@@ -86,18 +88,18 @@ def load_tfd():
 
 
 def load_dataset(
-    ds_name: str,
+    dataset_config: DatasetConfig,
 ) -> tuple[
     datasets.Dataset | torchvision.datasets.VisionDataset,
     datasets.Dataset | torchvision.datasets.VisionDataset,
 ]:
-    if ds_name == "mnist":
+    if dataset_config.name == "mnist":
         return load_mnist()
-    elif ds_name == "celeba":
+    elif dataset_config.name == "celeba":
         return load_celeba()
-    elif ds_name == "tfd":
+    elif dataset_config.name == "tfd":
         return load_tfd()
-    elif ds_name == "lsun":
-        return load_lsun()
+    elif dataset_config.name == "lsun":
+        return load_lsun(dataset_config)
     else:
         raise Exception()

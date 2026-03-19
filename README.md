@@ -1,7 +1,8 @@
 # mnist-gan
 Training: 
-- *Vanilla dense GAN on MNIST* Minimal GAN example before introducing modern techniques.
-- *DCGAN on CelebA*
+- *Vanilla dense GAN on MNIST and TFD* Minimal GAN example before introducing modern techniques.
+- *DCGAN on CelebA and LSUN Bedrooms*
+- *WGAN on LSUN Bedrooms*
 
 ## Running
 Build docker image
@@ -14,7 +15,7 @@ docker run --privileged --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack
 ```
 Run training
 ```python
-python run_train.py vanilla_mnist
+python run_train.py configs/vanilla_mnist.yaml
 ```
 
 ## Vanilla GAN - MNIST
@@ -96,3 +97,11 @@ Samples generated from a fixed latent vector.
 
 ### Interpolations
 * ![](results/dcgan_lsun/DCGAN_lsun_interpolated.png)
+
+## WGAN - LSUN bedrooms
+Uses same architecture as DCGAN, critic instead of dicriminator. Changed loss to Wasserstein distance, optimizer to RMSprop. WGAN trains critic more often than generator. Clips discriminator weights to maintain Lipschitz continuity.
+### Generations
+* ![](results/wgan_lsun/wgan_lsun_generated.png)
+
+### Interpolations
+* ![](results/wgan_lsun/wgan_lsun_interpolated.png)

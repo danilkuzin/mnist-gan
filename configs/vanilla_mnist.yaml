@@ -18,6 +18,7 @@ generator:
 
 discriminator: 
   num_features: 240
+  discriminator_loss_type: sum_log
 
 visualise:
   plot_epochs: 10

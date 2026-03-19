@@ -14,17 +14,20 @@ class TrainingConfig(BaseModel):
     epochs: int
     batch_size: int
     seed: int
+    n_critic: Optional[int]
+    weight_clip: Optional[float]
 
 
 class GeneratorConfig(BaseModel):
     z_dim: int
     num_features: int
-    generator_loss_type: Optional[str] = None
+    generator_loss_type: str
     pretrain_epochs: int
 
 
 class DiscriminatorConfig(BaseModel):
     num_features: int
+    discriminator_loss_type: str
 
 
 class VisualiseConfig(BaseModel):
@@ -63,8 +66,8 @@ class GlobalConfig(BaseModel):
     schedulers: Optional[SchedulersConfig]
 
 
-def load_config(path: str):
-    with open("configs/" + path + ".yaml", "r") as file:
+def load_config(path: str) -> GlobalConfig:
+    with open(path, "r") as file:
         data = safe_load(file)
 
     return GlobalConfig(**data)

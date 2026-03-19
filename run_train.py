@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import time
 from argparse import ArgumentParser
 
@@ -50,7 +51,7 @@ def compute_pixel_mean(dataset):
     return (total / count) / 255.0
 
 
-def load_model(config):
+def load_model(config, device):
     if config.model == "vanilla_gan":
         im_dim = (config.dataset.image_size**2) * config.dataset.channels
         gan = GAN(
@@ -58,7 +59,7 @@ def load_model(config):
             im_dim,
             config.generator.num_features,
             config.discriminator.num_features,
-        ).to("cuda")
+        ).to(device)
 
         gan.gen.apply(init_generator)
         gan.dis.apply(init_discriminator)
@@ -69,7 +70,7 @@ def load_model(config):
             num_channels=config.dataset.channels,
             num_gen_features=config.generator.num_features,
             num_disc_features=config.discriminator.num_features,
-        ).to("cuda")
+        ).to(device)
 
         initialize_weights(gan.dis)
         initialize_weights(gan.gen)
@@ -119,17 +120,19 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config = load_config(args.config)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     torch.manual_seed(config.training.seed)
 
-    out_folder = f"/data/logs/{config.model}/{config.dataset.name}"
+    out_folder = f"/data/logs/{Path(args.config).stem}"
     run_id = f"{time.strftime('%Y%m%d-%H%M%S')}_{config.generator.generator_loss_type}"
     os.makedirs(out_folder, exist_ok=True)
     writer = SummaryWriter(log_dir=f"{out_folder}/{run_id}")
 
-    ds_train, ds_test = load_dataset(config.dataset.name)
+    ds_train, ds_test = load_dataset(config.dataset)
     dl_train = DataLoader(ds_train, shuffle=True, batch_size=config.training.batch_size)
 
-    gan = load_model(config)
+    gan = load_model(config, device)
     optimizer_d, optimizer_g, scheduler_d, scheduler_g = get_optimizers(gan, config)
 
     if config.model == "vanilla_gan":
@@ -155,9 +158,9 @@ if __name__ == "__main__":
         raise Exception()
 
     with torch.no_grad():
-        z = sample_fn().to("cuda")
-        z1 = sample_fn()[0].to("cuda")
-        z2 = sample_fn()[0].to("cuda")
+        z = sample_fn().to(device)
+        z1 = sample_fn()[0].to(device)
+        z2 = sample_fn()[0].to(device)
         z_interp = interpolate(z1, z2, num_interp).squeeze(1)
 
         generated = gan.gen(z)
@@ -198,10 +201,10 @@ if __name__ == "__main__":
     if config.generator.pretrain_epochs > 0:
         for epoch in range(config.generator.pretrain_epochs):
             for real_images, _ in dl_train:
-                real_images = real_images.to("cuda")
+                real_images = real_images.to(device)
                 batch_size = real_images.size(0)
 
-                z = torch.randn(batch_size, 100, device="cuda")
+                z = torch.randn(batch_size, 100, device=device)
                 fake_images = gan.gen(z)
                 loss = criterion(fake_images, real_images)
 
@@ -221,6 +224,7 @@ if __name__ == "__main__":
             optimizer_g,
             gan,
             config.generator.generator_loss_type,
+            config.discriminator.discriminator_loss_type,
             sample_fn,
             format_ds,
             config.visualise.plot_steps,
@@ -239,6 +243,9 @@ if __name__ == "__main__":
                 value_range,
             ),
             last_iter,
+            config.training.n_critic,
+            config.training.weight_clip,
+            device,
         )
         if not scheduler_d is None:
             scheduler_d.step()
