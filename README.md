@@ -1,8 +1,13 @@
 # mnist-gan
-Training: 
-- *Vanilla dense GAN on MNIST and TFD* Minimal GAN example before introducing modern techniques.
-- *DCGAN on CelebA and LSUN Bedrooms*
-- *WGAN on LSUN Bedrooms*
+A PyTorch implementation of timeline of GAN models from vanilla to WGAN-GP. The goal of this repository is to understand why architectural changes were introduced, how training stability has improved and how losses behave in practice.
+
+| Model       | Dataset      | Architecture         | Loss             | Optimizer |
+| ----------- | ------------ | -------------------- | ---------------- | --------- |
+| Vanilla GAN | MNIST, TFD   | MLP + Maxout         | BCE              | SGD       |
+| DCGAN       | CelebA, LSUN | Conv / ConvTranspose | BCE              | Adam      |
+| WGAN        | LSUN         | DCGAN architecture   | Wasserstein      | RMSprop   |
+| WGAN-GP     | LSUN         | DCGAN + InstanceNorm | Wasserstein + GP | Adam      |
+
 
 ## Running
 Build docker image
@@ -19,6 +24,7 @@ python run_train.py configs/vanilla_mnist.yaml
 ```
 
 ## Vanilla GAN - MNIST
+Minimal GAN example before introducing modern techniques. Uses Maxout and linear layers. 
 
 ### Model
 **Generator**
@@ -68,9 +74,10 @@ Samples generated from a fixed latent vector.
 ## DCGAN - CelebA
 
 ### Model
+Adds Conv and ConvTranspose, BatchNorm instead of Maxout, LeakyReLU instead of ReLU, Adam optimizer. 
 **Generator**
 * Blocks: 4 * ConvTrasnpose/BatchNorm/ReLU
-* ConvTrasnpose
+* ConvTranspose
 * tanh
 
 **Discriminator**
@@ -85,23 +92,32 @@ Samples generated from a fixed latent vector.
 * batch size = 128
 
 ### Generations
-* ![](results/dcgan_celeba/generations.png)
+![](results/dcgan_celeba/generations.png)
 
 ### Interpolations
-* ![](results/dcgan_celeba/interpolations.png)
+![](results/dcgan_celeba/interpolations.png)
 
 ## DCGAN - LSUN bedrooms
 
 ### Generations
-* ![](results/dcgan_lsun/DCGAN_lsun_generated.png)
+![](results/dcgan_lsun/DCGAN_lsun_generated.png)
 
 ### Interpolations
-* ![](results/dcgan_lsun/DCGAN_lsun_interpolated.png)
+![](results/dcgan_lsun/DCGAN_lsun_interpolated.png)
 
 ## WGAN - LSUN bedrooms
-Uses same architecture as DCGAN, critic instead of dicriminator. Changed loss to Wasserstein distance, optimizer to RMSprop. WGAN trains critic more often than generator. Clips discriminator weights to maintain Lipschitz continuity.
+Uses same architecture as DCGAN, critic instead of dicriminator. Changed loss to Wasserstein distance, which maximizes the gap between the average score of real images and the average score of fake images. WGAN trains critic more often than generator. Optimizer changed to RMSprop to work with non-stationary optimization landscape due to rapidly changing critic. Clips critic weights to maintain Lipschitz continuity.
 ### Generations
-* ![](results/wgan_lsun/wgan_lsun_generated.png)
+![](results/wgan_lsun/wgan_lsun_generated.png)
 
 ### Interpolations
-* ![](results/wgan_lsun/wgan_lsun_interpolated.png)
+![](results/wgan_lsun/wgan_lsun_interpolated.png)
+
+## WGAN-GP - LSUN bedrooms
+Uses same architecture as DCGAN, but with BatchNorm2d replaced by InstanceNorm2d in critic. Instead of weight clipping uses gradient penalty for critic loss to maintain Lipschitz continuity. Uses Adam.
+
+### Generations
+![](results/wgangp_lsun/wgangp_lsun_generated.png)
+
+### Interpolations
+![](results/wgangp_lsun/wgangp_lsun_interpolated.png)

@@ -37,15 +37,21 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, num_channels: int, num_features: int) -> None:
+    def __init__(
+        self, num_channels: int, num_features: int, disc_normalization: str
+    ) -> None:
         super().__init__()
 
         self.disc = nn.Sequential(
             nn.Conv2d(num_channels, num_features, kernel_size=4, stride=2, padding=1),
             nn.LeakyReLU(0.2),
-            self._block(num_features, num_features * 2, 4, 2, 1),
-            self._block(num_features * 2, num_features * 4, 4, 2, 1),
-            self._block(num_features * 4, num_features * 8, 4, 2, 1),
+            self._block(num_features, num_features * 2, 4, 2, 1, disc_normalization),
+            self._block(
+                num_features * 2, num_features * 4, 4, 2, 1, disc_normalization
+            ),
+            self._block(
+                num_features * 4, num_features * 8, 4, 2, 1, disc_normalization
+            ),
             nn.Conv2d(num_features * 8, 1, 4, 1, 0),
         )
 
@@ -56,10 +62,13 @@ class Discriminator(nn.Module):
         kernel_size: _size_2_t,
         stride: _size_2_t,
         padding: _size_2_t,
+        disc_normalization: str,
     ) -> nn.Sequential:
+        NormClass = getattr(nn, disc_normalization)
+
         return nn.Sequential(
             nn.Conv2d(in_ch, out_ch, kernel_size, stride, padding, bias=False),
-            nn.BatchNorm2d(out_ch),
+            NormClass(out_ch),
             nn.LeakyReLU(0.2),
         )
 
@@ -74,10 +83,11 @@ class DCGAN(nn.Module):
         num_channels: int,
         num_gen_features: int,
         num_disc_features: int,
+        disc_normalization: str,
     ) -> None:
         super().__init__()
         self.gen = Generator(z_dim, num_channels, num_gen_features)
-        self.dis = Discriminator(num_channels, num_disc_features)
+        self.dis = Discriminator(num_channels, num_disc_features, disc_normalization)
 
 
 def initialize_weights(model: nn.Module) -> None:

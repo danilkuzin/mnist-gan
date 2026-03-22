@@ -10,6 +10,31 @@ from ganmnist.models.dcgan import DCGAN
 from ganmnist.models.vanilla_gan import GAN
 
 
+def gradient_penalty(critic, real, fake, device):
+    B, C, H, W = real.shape
+    epsilon = torch.rand((B, 1, 1, 1), device=device)
+    interpolated = real * epsilon + fake * (1 - epsilon)
+    interpolated.requires_grad_(True)
+
+    mixed_scores = critic(interpolated)
+
+    gradient = torch.autograd.grad(
+        inputs=interpolated,
+        outputs=mixed_scores,
+        grad_outputs=torch.ones_like(mixed_scores),
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+
+    gradient = gradient.view(gradient.shape[0], -1)
+    gradient_norm = gradient.norm(2, dim=1)
+    gradient_penalty = torch.mean((gradient_norm - 1) ** 2)
+    # print("gp:", gradient_penalty.item())
+    # print("grad norm:", gradient_norm.mean().item())
+
+    return gradient_penalty
+
+
 def train_epoch(
     dl: torch.utils.data.DataLoader,
     optimizer_d: torch.optim.Optimizer,
@@ -25,6 +50,7 @@ def train_epoch(
     last_iter: int,
     n_critic: Optional[int],
     weight_clip: Optional[float],
+    lambda_gp: Optional[float],
     device: str,
 ) -> tuple[float, float, float, int]:
 
@@ -42,7 +68,7 @@ def train_epoch(
 
         optimizer_d.zero_grad()
 
-        z_d = sample_fn().to(device)
+        z_d = sample_fn()[: x.shape[0]].to(device)
 
         g_z = gan.gen(z_d)
         disc_real = gan.dis(x).view(-1)
@@ -50,6 +76,7 @@ def train_epoch(
 
         loss_d_real = None
         loss_d_fake = None
+        gp_postfix = None
         if discriminator_loss_type == "sum_log":
             # vanilla gan
             loss_d_real = F.binary_cross_entropy_with_logits(
@@ -73,13 +100,17 @@ def train_epoch(
         elif discriminator_loss_type == "mean":
             # wgan
             loss_d = -(torch.mean(disc_real) - torch.mean(disc_fake))
+            if lambda_gp is not None:
+                gp = gradient_penalty(gan.dis, x, g_z.detach(), device)
+                loss_d += lambda_gp * gp
+                gp_postfix = gp.item()  # want to have 0.5-5
         else:
             raise Exception("Wrong discriminator loss type")
 
         loss_d.backward()
         optimizer_d.step()
 
-        if discriminator_loss_type == "mean":
+        if weight_clip is not None:
             for p in gan.dis.parameters():
                 p.data.clamp_(-weight_clip, weight_clip)
 
@@ -124,18 +155,20 @@ def train_epoch(
                 p.requires_grad = True
 
         step_time = time.time() - step_start
-        pbar.set_postfix(
-            {
-                "D_real": (
-                    f"{loss_d_real.item():.3f}" if loss_d_real is not None else None
-                ),
-                "D_fake": (
-                    f"{loss_d_fake.item():.3f}" if loss_d_fake is not None else None
-                ),
-                "G": f"{loss_g.item():.3f}" if loss_g is not None else "None",
-                "t/b": f"{step_time*1000:.1f}ms",
-            }
-        )
+        postfix = {
+            "D_real": (
+                f"{loss_d_real.item():.3f}" if loss_d_real is not None else None
+            ),
+            "D_fake": (
+                f"{loss_d_fake.item():.3f}" if loss_d_fake is not None else None
+            ),
+            "G": f"{loss_g.item():.3f}" if loss_g is not None else "None",
+            "t/b": f"{step_time*1000:.1f}ms",
+        }
+        if gp_postfix is not None:
+            postfix["gp"] = gp_postfix
+
+        pbar.set_postfix(postfix)
 
         if plot_steps > 0:
             if step % plot_steps == 0:

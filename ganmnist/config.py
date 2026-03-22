@@ -15,7 +15,8 @@ class TrainingConfig(BaseModel):
     batch_size: int
     seed: int
     n_critic: Optional[int]
-    weight_clip: Optional[float]
+    weight_clip: Optional[float] = None
+    lambda_gp: Optional[float] = None
 
 
 class GeneratorConfig(BaseModel):
@@ -28,6 +29,7 @@ class GeneratorConfig(BaseModel):
 class DiscriminatorConfig(BaseModel):
     num_features: int
     discriminator_loss_type: str
+    normalization: str
 
 
 class VisualiseConfig(BaseModel):

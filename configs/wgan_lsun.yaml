@@ -21,6 +21,7 @@ generator:
 discriminator: 
   num_features: 64
   discriminator_loss_type: mean
+  normalization: BatchNorm2d
 
 visualise:
   plot_epochs: 1

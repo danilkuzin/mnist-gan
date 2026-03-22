@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
 
-from ganmnist.config import load_config
+from ganmnist.config import GlobalConfig, load_config
 from ganmnist.data import load_dataset
 from ganmnist.models.dcgan import DCGAN, initialize_weights
 from ganmnist.models.vanilla_gan import GAN, init_discriminator, init_generator
@@ -51,7 +51,7 @@ def compute_pixel_mean(dataset):
     return (total / count) / 255.0
 
 
-def load_model(config, device):
+def load_model(config: GlobalConfig, device):
     if config.model == "vanilla_gan":
         im_dim = (config.dataset.image_size**2) * config.dataset.channels
         gan = GAN(
@@ -70,6 +70,7 @@ def load_model(config, device):
             num_channels=config.dataset.channels,
             num_gen_features=config.generator.num_features,
             num_disc_features=config.discriminator.num_features,
+            disc_normalization=config.discriminator.normalization,
         ).to(device)
 
         initialize_weights(gan.dis)
@@ -245,6 +246,7 @@ if __name__ == "__main__":
             last_iter,
             config.training.n_critic,
             config.training.weight_clip,
+            config.training.lambda_gp,
             device,
         )
         if not scheduler_d is None:
