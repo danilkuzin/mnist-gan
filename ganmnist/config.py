@@ -29,7 +29,8 @@ class GeneratorConfig(BaseModel):
 class DiscriminatorConfig(BaseModel):
     num_features: int
     discriminator_loss_type: str
-    normalization: str
+    normalization: Optional[str] = None
+    use_spectral_norm: bool = False
 
 
 class VisualiseConfig(BaseModel):

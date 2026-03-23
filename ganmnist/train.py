@@ -104,6 +104,10 @@ def train_epoch(
                 gp = gradient_penalty(gan.dis, x, g_z.detach(), device)
                 loss_d += lambda_gp * gp
                 gp_postfix = gp.item()  # want to have 0.5-5
+        elif discriminator_loss_type == "hinge":
+            loss_d = torch.mean(F.relu(1 - disc_real)) + torch.mean(
+                F.relu(1 + disc_fake)
+            )
         else:
             raise Exception("Wrong discriminator loss type")
 

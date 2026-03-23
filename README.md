@@ -121,3 +121,12 @@ Uses same architecture as DCGAN, but with BatchNorm2d replaced by InstanceNorm2d
 
 ### Interpolations
 ![](results/wgangp_lsun/wgangp_lsun_interpolated.png)
+
+
+## SNGAN - LSUN bedrooms
+Adds spectral normalization and hinge loss for critic.
+### Generations
+![](results/sngan_lsun/sngan_generated.png)
+
+### Interpolations
+![](results/sngan_lsun/sngan_interpolated.png)

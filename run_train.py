@@ -71,6 +71,7 @@ def load_model(config: GlobalConfig, device):
             num_gen_features=config.generator.num_features,
             num_disc_features=config.discriminator.num_features,
             disc_normalization=config.discriminator.normalization,
+            disc_use_spectral_norm=config.discriminator.use_spectral_norm,
         ).to(device)
 
         initialize_weights(gan.dis)
