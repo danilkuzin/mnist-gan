@@ -7,6 +7,8 @@ A PyTorch implementation of timeline of GAN models from vanilla to WGAN-GP. The 
 | DCGAN       | CelebA, LSUN | Conv / ConvTranspose | BCE              | Adam      |
 | WGAN        | LSUN         | DCGAN architecture   | Wasserstein      | RMSprop   |
 | WGAN-GP     | LSUN         | DCGAN + InstanceNorm | Wasserstein + GP | Adam      |
+| SNGAN       | LSUN         | DCGAN + SpectralNorm | Hinge            | Adam      |
+| cGAN        | Cifar10      | DCGAN + Proj Disc    | Wasserstein + GP | Adam      |
 
 
 ## Running
@@ -130,3 +132,11 @@ Adds spectral normalization and hinge loss for critic.
 
 ### Interpolations
 ![](results/sngan_lsun/sngan_interpolated.png)
+
+# CGAN - Cifar10
+Adds projection discriminator to WGAN-GP. 
+### Generations
+![](results/cgan_cifar10/cgan_cifar10_generated.png)
+
+### Interpolations
+![](results/cgan_cifar10/cgan_cifar10_interpolated.png)

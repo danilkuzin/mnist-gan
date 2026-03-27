@@ -17,7 +17,7 @@ def load_mnist() -> tuple[datasets.Dataset, datasets.Dataset]:
 
     def transform_fn(batch):
         batch["image"] = [preprocess(img) for img in batch["image"]]
-        batch["label"] = [torch.tensor(l) for l in batch["label"]]
+        batch["label"] = [torch.tensor(label) for label in batch["label"]]
         return batch
 
     ds.set_transform(transform_fn)
@@ -44,7 +44,6 @@ def load_lsun(
 
     def transform_fn(batch):
         batch["image"] = [preprocess(img) for img in batch["image"]]
-        # batch["label"] = [torch.tensor(l) for l in batch["label"]]
         return batch
 
     ds.set_transform(transform_fn)
@@ -87,6 +86,29 @@ def load_tfd():
     return dataset, None
 
 
+def load_cifar10() -> tuple[datasets.Dataset, datasets.Dataset]:
+    ds = datasets.load_dataset(
+        "uoft-cs/cifar10", cache_dir="/data/huggingface/datasets"
+    )
+
+    preprocess = transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+        ]
+    )
+
+    def transform_fn(batch):
+        return {
+            "image": [preprocess(img) for img in batch["img"]],
+            "labels": [torch.tensor(label) for label in batch["label"]],
+        }
+
+    ds.set_transform(transform_fn)
+
+    return ds["train"], ds["test"]
+
+
 def load_dataset(
     dataset_config: DatasetConfig,
 ) -> tuple[
@@ -101,5 +123,7 @@ def load_dataset(
         return load_tfd()
     elif dataset_config.name == "lsun":
         return load_lsun(dataset_config)
+    elif dataset_config.name == "cifar10":
+        return load_cifar10()
     else:
         raise Exception()

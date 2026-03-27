@@ -3,6 +3,7 @@ from pathlib import Path
 import time
 from argparse import ArgumentParser
 
+from ganmnist.visualize import interpolate, save_grid
 import torch
 import torchvision.utils
 from torch.utils.data import DataLoader
@@ -14,29 +15,6 @@ from ganmnist.data import load_dataset
 from ganmnist.models.dcgan import DCGAN, initialize_weights
 from ganmnist.models.vanilla_gan import GAN, init_discriminator, init_generator
 from ganmnist.train import train_epoch
-
-
-def save_grid(
-    generated: torch.Tensor,
-    writer: SummaryWriter,
-    tag: str,
-    step: int,
-    nrows: int,
-    value_range: tuple[int, int],
-):
-    grid = generated.detach().cpu().numpy()
-    grid = torchvision.utils.make_grid(
-        generated,
-        nrow=nrows,
-        normalize=True,
-        value_range=value_range,
-    )
-    writer.add_image(tag, grid, global_step=step)
-
-
-def interpolate(z1, z2, steps):
-    alphas = torch.linspace(0, 1, steps, device=z1.device)
-    return torch.stack([(1 - a) * z1 + a * z2 for a in alphas])
 
 
 def compute_pixel_mean(dataset):
@@ -65,14 +43,7 @@ def load_model(config: GlobalConfig, device):
         gan.dis.apply(init_discriminator)
 
     elif config.model == "dcgan":
-        gan = DCGAN(
-            z_dim=config.generator.z_dim,
-            num_channels=config.dataset.channels,
-            num_gen_features=config.generator.num_features,
-            num_disc_features=config.discriminator.num_features,
-            disc_normalization=config.discriminator.normalization,
-            disc_use_spectral_norm=config.discriminator.use_spectral_norm,
-        ).to(device)
+        gan = DCGAN(config.dataset, config.generator, config.discriminator).to(device)
 
         initialize_weights(gan.dis)
         initialize_weights(gan.gen)
@@ -82,7 +53,7 @@ def load_model(config: GlobalConfig, device):
     return gan
 
 
-def get_optimizers(gan, config):
+def get_optimizers(gan: GAN | DCGAN, config: GlobalConfig):
     OptimClassD = getattr(torch.optim, config.optimizers.discriminator.name)
     OptimClassG = getattr(torch.optim, config.optimizers.generator.name)
 
@@ -149,10 +120,10 @@ if __name__ == "__main__":
             format_ds = "torchvision"
     elif config.model == "dcgan":
         sample_fn = lambda: torch.randn(
-            (config.training.batch_size, config.generator.z_dim, 1, 1)
+            (config.training.batch_size, config.generator.z_dim)
         )
         value_range = (-1, 1)
-        if config.dataset.name == "lsun":
+        if config.dataset.name == "lsun" or config.dataset.name == "cifar10":
             format_ds = "huggingface"
         else:
             format_ds = "torchvision"
@@ -160,12 +131,27 @@ if __name__ == "__main__":
         raise Exception()
 
     with torch.no_grad():
-        z = sample_fn().to(device)
-        z1 = sample_fn()[0].to(device)
-        z2 = sample_fn()[0].to(device)
-        z_interp = interpolate(z1, z2, num_interp).squeeze(1)
+        z_plotting = sample_fn().to(device)
+        z1_plotting = sample_fn()[0].to(device)
+        z2_plotting = sample_fn()[0].to(device)
+        y_plotting = None
 
-        generated = gan.gen(z)
+        if config.training.conditional:
+            y_plotting = torch.randint(
+                config.dataset.classes, (config.training.batch_size,), device=device
+            )
+            y_interp = (
+                torch.randint(config.dataset.classes, (1,), device=device)
+                .repeat(num_interp)
+                .squeeze()
+            )
+
+        z_interp = interpolate(z1_plotting, z2_plotting, num_interp).squeeze(1)
+
+        if config.training.conditional:
+            generated = gan.gen(z_plotting, y_plotting)
+        else:
+            generated = gan.gen(z_plotting)
         generated = generated.view(
             -1,
             config.dataset.channels,
@@ -181,7 +167,10 @@ if __name__ == "__main__":
             value_range,
         )
 
-        interpolated = gan.gen(z_interp)
+        if config.training.conditional:
+            interpolated = gan.gen(z_interp, y_interp)
+        else:
+            interpolated = gan.gen(z_interp)
         interpolated = interpolated.view(
             -1,
             config.dataset.channels,
@@ -193,21 +182,27 @@ if __name__ == "__main__":
             writer,
             "Interpolated",
             0,
-            1,
+            num_interp,
             value_range,
         )
 
     optimizer = torch.optim.SGD(gan.gen.parameters(), lr=0.05, momentum=0.5)
     criterion = torch.nn.BCELoss()
 
-    if config.generator.pretrain_epochs > 0:
+    if config.model == "vanilla_gan" and config.generator.pretrain_epochs > 0:
         for epoch in range(config.generator.pretrain_epochs):
             for real_images, _ in dl_train:
                 real_images = real_images.to(device)
                 batch_size = real_images.size(0)
 
-                z = torch.randn(batch_size, 100, device=device)
-                fake_images = gan.gen(z)
+                z = torch.randn(batch_size, config.generator.z_dim, device=device)
+                y = torch.randint(
+                    config.dataset.classes, (config.training.batch_size,), device=device
+                )
+                if config.training.conditional:
+                    fake_images = gan.gen(z, y)
+                else:
+                    fake_images = gan.gen(z)
                 loss = criterion(fake_images, real_images)
 
                 optimizer.zero_grad()
@@ -216,21 +211,19 @@ if __name__ == "__main__":
 
             print(epoch, loss.item())
 
-    last_iter = 0
+    # last_iter = 0
     for epoch in range(config.training.epochs):
         gan.gen.train()
         gan.dis.train()
-        train_loss_d_real, train_loss_d_fake, train_loss_g, last_iter = train_epoch(
+        train_epoch(
             dl_train,
             optimizer_d,
             optimizer_g,
             gan,
-            config.generator.generator_loss_type,
-            config.discriminator.discriminator_loss_type,
             sample_fn,
             format_ds,
-            config.visualise.plot_steps,
-            z,
+            z_plotting,
+            y_plotting,
             lambda g, b: save_grid(
                 g.view(
                     -1,
@@ -240,29 +233,28 @@ if __name__ == "__main__":
                 ),
                 writer,
                 "Generated",
-                last_iter + b,
+                b,
                 16,
                 value_range,
             ),
-            last_iter,
-            config.training.n_critic,
-            config.training.weight_clip,
-            config.training.lambda_gp,
+            epoch,
             device,
+            config,
+            writer,
         )
         if not scheduler_d is None:
             scheduler_d.step()
         if not scheduler_g is None:
             scheduler_g.step()
-        writer.add_scalar("D/real", train_loss_d_real, epoch)
-        writer.add_scalar("D/fake", train_loss_d_fake, epoch)
-        writer.add_scalar("G", train_loss_g, epoch)
 
         if epoch % config.visualise.plot_epochs == 0:
             gan.gen.eval()
             gan.dis.eval()
             with torch.no_grad():
-                generated = gan.gen(z)
+                if config.training.conditional:
+                    generated = gan.gen(z_plotting, y_plotting)
+                else:
+                    generated = gan.gen(z_plotting)
                 generated = generated.view(
                     -1,
                     config.dataset.channels,
@@ -273,12 +265,15 @@ if __name__ == "__main__":
                     generated,
                     writer,
                     "Generated",
-                    last_iter,
+                    epoch * len(dl_train),
                     16,
                     value_range,
                 )
 
-                interpolated = gan.gen(z_interp)
+                if config.training.conditional:
+                    interpolated = gan.gen(z_interp, y_interp)
+                else:
+                    interpolated = gan.gen(z_interp)
                 interpolated = interpolated.view(
                     -1,
                     config.dataset.channels,
@@ -289,11 +284,7 @@ if __name__ == "__main__":
                     interpolated,
                     writer,
                     "Interpolated",
-                    last_iter,
-                    1,
+                    epoch * len(dl_train),
+                    num_interp,
                     value_range,
                 )
-
-        print(
-            f"{epoch=}. {train_loss_d_real=:.4f} {train_loss_d_fake=:.4f} {train_loss_g=:.4f}"
-        )

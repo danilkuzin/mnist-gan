@@ -8,6 +8,7 @@ class DatasetConfig(BaseModel):
     name: str
     image_size: int
     channels: int
+    classes: Optional[int]
 
 
 class TrainingConfig(BaseModel):
@@ -17,6 +18,7 @@ class TrainingConfig(BaseModel):
     n_critic: Optional[int]
     weight_clip: Optional[float] = None
     lambda_gp: Optional[float] = None
+    conditional: bool = False
 
 
 class GeneratorConfig(BaseModel):
@@ -24,6 +26,7 @@ class GeneratorConfig(BaseModel):
     num_features: int
     generator_loss_type: str
     pretrain_epochs: int
+    conditional_embed_size: Optional[int]
 
 
 class DiscriminatorConfig(BaseModel):
@@ -31,6 +34,7 @@ class DiscriminatorConfig(BaseModel):
     discriminator_loss_type: str
     normalization: Optional[str] = None
     use_spectral_norm: bool = False
+    conditional: bool = False
 
 
 class VisualiseConfig(BaseModel):
