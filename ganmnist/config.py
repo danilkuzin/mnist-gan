@@ -8,7 +8,7 @@ class DatasetConfig(BaseModel):
     name: str
     image_size: int
     channels: int
-    classes: Optional[int]
+    classes: Optional[int] = 0
 
 
 class TrainingConfig(BaseModel):
@@ -26,7 +26,8 @@ class GeneratorConfig(BaseModel):
     num_features: int
     generator_loss_type: str
     pretrain_epochs: int
-    conditional_embed_size: Optional[int]
+    conditional_embed_size: Optional[int] = 0
+    use_attn: bool = False
 
 
 class DiscriminatorConfig(BaseModel):
@@ -35,6 +36,7 @@ class DiscriminatorConfig(BaseModel):
     normalization: Optional[str] = None
     use_spectral_norm: bool = False
     conditional: bool = False
+    use_attn: bool = False
 
 
 class VisualiseConfig(BaseModel):

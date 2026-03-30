@@ -9,7 +9,7 @@ A PyTorch implementation of timeline of GAN models from vanilla to WGAN-GP. The 
 | WGAN-GP     | LSUN         | DCGAN + InstanceNorm | Wasserstein + GP | Adam      |
 | SNGAN       | LSUN         | DCGAN + SpectralNorm | Hinge            | Adam      |
 | cGAN        | Cifar10      | DCGAN + Proj Disc    | Wasserstein + GP | Adam      |
-
+| SAGAN       | LSUN         | DCGAN + SA           | Hinge            | Adam      |
 
 ## Running
 Build docker image
@@ -140,3 +140,11 @@ Adds projection discriminator to WGAN-GP.
 
 ### Interpolations
 ![](results/cgan_cifar10/cgan_cifar10_interpolated.png)
+
+# SAGAN - LSUN bedrooms
+Adds self-attention layer
+### Generations
+![](results/sagan_lsun/sagan_lsun_generated.png)
+
+### Interpolations
+![](results/sagan_lsun/sagan_lsun_interpolated.png)

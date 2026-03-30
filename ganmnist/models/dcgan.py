@@ -9,6 +9,30 @@ from torch.nn.utils import spectral_norm
 from ganmnist.config import DatasetConfig, DiscriminatorConfig, GeneratorConfig
 
 
+class SelfAttention(nn.Module):
+    def __init__(self, in_channels: int):
+        super(SelfAttention, self).__init__()
+        self.query_conv = nn.Conv2d(in_channels, in_channels // 8, kernel_size=1)
+        self.key_conv = nn.Conv2d(in_channels, in_channels // 8, kernel_size=1)
+        self.value_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+
+        self.gamma = nn.Parameter(torch.zeros(1))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, C, W, H = x.size()
+        N = W * H
+
+        Q = self.query_conv(x).view(B, -1, N).permute(0, 2, 1)  # (B, N, C//8)
+        K = self.key_conv(x).view(B, -1, N)  # (B, C//8, N)
+        V = self.value_conv(x).view(B, -1, N)  # (B, C, N)
+
+        attn = torch.softmax(torch.bmm(Q, K), dim=-1)
+
+        out = torch.bmm(V, attn.permute(0, 2, 1)).view(B, C, W, H)
+
+        return self.gamma * out + x
+
+
 class Generator(nn.Module):
     def __init__(
         self,
@@ -39,6 +63,8 @@ class Generator(nn.Module):
                 self._block(cur_features, next_features, 4, 2, 1),
             )
             cur_features = next_features
+        if gen_conf.use_attn:
+            layers.append(SelfAttention(cur_features))
         layers.append(nn.ConvTranspose2d(cur_features, self.num_channels, 4, 2, 1))
         layers.append(nn.Tanh())
 
@@ -58,12 +84,10 @@ class Generator(nn.Module):
             nn.ReLU(),
         )
 
-    def forward(self, z: torch.Tensor, labels: Optional[torch.Tensor]) -> torch.Tensor:
+    def forward(
+        self, z: torch.Tensor, labels: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         if hasattr(self, "embed") and labels is not None:
-            # print(f"{labels.shape=} {z.shape=} {self.embed=}")
-            # y_embed = self.embed(labels).view(labels.shape[0], -1, 1, 1)
-            # z = torch.cat([z, y_embed], dim=1)
-            # z = z.unsqueeze(2).unsqueeze(3)
             z = torch.cat([z, self.embed(labels)], dim=1)
         z = z.unsqueeze(2).unsqueeze(3)
         return self.gen(z)
@@ -99,6 +123,8 @@ class Discriminator(nn.Module):
             )
         )
         cur_features = self.num_features
+        if dis_conf.use_attn:
+            layers.append(SelfAttention(cur_features))
         for _ in range(num_blocks - 1):
             next_features = cur_features * 2
             layers.append(
@@ -152,7 +178,9 @@ class Discriminator(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x: torch.Tensor, labels: Optional[torch.Tensor]) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, labels: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         h = self.blocks(x)
         out = self.final_conv(h).view(-1, 1)
         if self.conditional and labels is not None:

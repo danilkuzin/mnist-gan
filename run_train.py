@@ -3,6 +3,8 @@ from pathlib import Path
 import time
 from argparse import ArgumentParser
 
+from ganmnist.models import dcgan
+from ganmnist.models import vanilla_gan
 from ganmnist.visualize import interpolate, save_grid
 import torch
 import torchvision.utils
@@ -15,6 +17,7 @@ from ganmnist.data import load_dataset
 from ganmnist.models.dcgan import DCGAN, initialize_weights
 from ganmnist.models.vanilla_gan import GAN, init_discriminator, init_generator
 from ganmnist.train import train_epoch
+import torchmetrics.image.fid, torchmetrics.image.inception
 
 
 def compute_pixel_mean(dataset):
@@ -82,6 +85,66 @@ def get_optimizers(gan: GAN | DCGAN, config: GlobalConfig):
             scheduler_g = SchedClassG(optimizer_g, **config.schedulers.generator.params)
 
     return optimizer_d, optimizer_g, scheduler_d, scheduler_g
+
+
+def evaluate(
+    gen: dcgan.Generator | vanilla_gan.Generator,
+    config: GlobalConfig,
+    fid: torchmetrics.image.fid.FrechetInceptionDistance,
+    device,
+    num_samples: int,
+) -> dict[str, float]:
+    inception = torchmetrics.image.inception.InceptionScore(
+        normalize=True,
+    ).to(device)
+
+    batch_size = config.training.batch_size
+    num_batches = num_samples // batch_size
+
+    print(f"Generating {num_samples} images for evaluation...")
+    for _ in tqdm(range(num_batches), desc="Evaluating", leave=False):
+        z = sample_fn().to(device)
+        if config.training.conditional:
+            y = torch.randint(
+                config.dataset.classes, (config.training.batch_size,), device=device
+            )
+            fake_imgs = gen(z, y)
+        else:
+            fake_imgs = gen(z)
+
+        if hasattr(gen, "gen") and isinstance(gen.gen[-1], torch.nn.Tanh):
+            fake_imgs = (fake_imgs + 1) / 2.0  # [-1, 1] -> [1, 0]
+
+        fid.update(fake_imgs, real=False)
+        inception.update(fake_imgs)
+
+    fid_score = fid.compute().item()
+    is_mean, is_std = inception.compute()
+
+    fid.reset()
+    inception.reset()
+
+    return {"FID": fid_score, "IS_mean": is_mean.item(), "IS_std": is_std.item()}
+
+
+@torch.no_grad()
+def precompute_real_fid(dataloader, device, num_samples=10000):
+    fid = torchmetrics.image.fid.FrechetInceptionDistance(
+        feature=2048, normalize=True, reset_real_features=False
+    ).to(device)
+
+    count = 0
+    print("Pre-computing real image statistics for FID...")
+    for batch in dataloader:
+        real_imgs = batch["image"].to(device)
+        real_imgs = (real_imgs + 1) / 2.0
+
+        fid.update(real_imgs, real=True)
+        count += real_imgs.shape[0]
+        if count >= num_samples:
+            break
+
+    return fid
 
 
 if __name__ == "__main__":
@@ -211,7 +274,8 @@ if __name__ == "__main__":
 
             print(epoch, loss.item())
 
-    # last_iter = 0
+    base_fid_metric = precompute_real_fid(dl_train, device, num_samples=10000)
+
     for epoch in range(config.training.epochs):
         gan.gen.train()
         gan.dis.train()
@@ -288,3 +352,12 @@ if __name__ == "__main__":
                     num_interp,
                     value_range,
                 )
+                metrics = evaluate(
+                    gan.gen, config, base_fid_metric, device, num_samples=10000
+                )
+
+                print(f"Epoch {epoch} Evaluation:")
+                print(f"FID: {metrics['FID']:.2f} | IS: {metrics['IS_mean']:.2f}")
+
+                writer.add_scalar("Eval/FID", metrics["FID"], epoch)
+                writer.add_scalar("Eval/IS", metrics["IS_mean"], epoch)
